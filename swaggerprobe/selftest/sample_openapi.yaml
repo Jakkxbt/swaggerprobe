@@ -1,0 +1,74 @@
+openapi: 3.0.3
+info:
+  title: SwaggerProbe Selftest API
+  version: "1.0"
+servers:
+  - url: http://127.0.0.1:0
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /health:
+    get:
+      security: []
+      responses:
+        "200":
+          description: clean control
+  /private:
+    get:
+      responses:
+        "200":
+          description: private data
+  /orders/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: order
+  /search:
+    get:
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: search
+  /users:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "200":
+          description: user
+  /public:
+    get:
+      security: []
+      responses:
+        "200":
+          description: public route
+  /debug:
+    get:
+      security: []
+      responses:
+        "500":
+          description: stack trace
