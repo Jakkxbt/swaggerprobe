@@ -60,7 +60,7 @@ swaggerprobe -s openapi.yaml --base https://api.target.com \
 
 - `auth` - missing or broken authentication on operations declaring security
 - `bola` - cross-context object access and ID enumeration probes
-- `injection` - SQL, NoSQL, command, SSTI, traversal, and error-based payloads
+- `injection` - SQL, NoSQL, command, traversal, error-based, and multi-engine SSTI payloads (Jinja/Twig, Freemarker/JSP-EL, Ruby/JSF, ERB/EJS), confirmed by server-side evaluation rather than a loose string match
 - `massassign` - extra sensitive fields in JSON request bodies
 - `method` - undeclared HTTP methods that unexpectedly work
 - `errors` - stack traces, framework banners, debug flags, SQL errors, and internal hosts

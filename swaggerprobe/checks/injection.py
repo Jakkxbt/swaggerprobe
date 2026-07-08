@@ -4,8 +4,18 @@ import time
 from ..models import Finding
 from ..request import build_request, send
 
-PAYLOADS = ["'", "{{7*7}}", "../../../../etc/passwd", "$(id)"]
+PAYLOADS = ["'", "../../../../etc/passwd", "$(id)"]
 ERROR_RE = re.compile(r"(sql syntax|sqlite|mysql|postgres|ora-|odbc|traceback|root:x:0:0|uid=\d+|syntax error)", re.I)
+
+# SSTI probes across template engines. Each payload evaluates 7*7; a reflected
+# "49" that was not in the baseline is server-side evaluation. Covering the
+# common engine syntaxes catches Freemarker/JSP-EL/Ruby/ERB SSTI, not just Jinja.
+SSTI_PROBES = [
+    ("{{7*7}}", "49"),      # Jinja2, Twig, Nunjucks
+    ("${7*7}", "49"),       # Freemarker, JSP EL, Thymeleaf
+    ("#{7*7}", "49"),       # Ruby (slim/haml), JSF EL
+    ("<%= 7*7 %>", "49"),   # ERB, EJS
+]
 
 
 def run(op, ctx, baseline):
@@ -23,9 +33,18 @@ def run(op, ctx, baseline):
             elif resp.status >= 500 and base_resp.status < 500:
                 findings.append(Finding("MEDIUM", "injection", op.method, op.path, meta, resp.status,
                                         f"{param.name} caused HTTP {resp.status} vs baseline {base_resp.status}", "MEDIUM"))
-            elif payload == "{{7*7}}" and "49" in resp.body and "49" not in base_resp.body:
+        for payload, expected in SSTI_PROBES:
+            req, meta = build_request(op, ctx.base_url, ctx.auth, overrides={param.name: payload})
+            resp = send(req, timeout=ctx.timeout)
+            ctx.requests_sent += 1
+            # Confirmed SSTI: the arithmetic result appears in the response but the
+            # literal payload does not (i.e. the server evaluated it, not echoed it),
+            # and it was not already present in the baseline body.
+            if (expected in resp.body and payload not in resp.body
+                    and expected not in base_resp.body):
                 findings.append(Finding("HIGH", "injection", op.method, op.path, meta, resp.status,
-                                        f"{param.name} reflected SSTI math result 49", "HIGH"))
+                                        f"{param.name} evaluated SSTI '{payload}' -> {expected}", "HIGH"))
+                break  # one confirmed engine is enough; avoid duplicate findings
         if ctx.time_based:
             req, meta = build_request(op, ctx.base_url, ctx.auth, overrides={param.name: "sleep(2)"})
             first = send(req, timeout=max(ctx.timeout, 5))
