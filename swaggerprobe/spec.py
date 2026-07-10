@@ -37,9 +37,9 @@ def _parse_json_or_yaml(raw, source):
 
 
 def _base_from_spec(data):
-    if data.get("openapi", "").startswith("3"):
+    if str(data.get("openapi") or "").startswith("3"):
         servers = data.get("servers") or []
-        if servers:
+        if servers and isinstance(servers[0], dict):
             return servers[0].get("url", "")
         return ""
     scheme = (data.get("schemes") or ["http"])[0]
@@ -49,7 +49,9 @@ def _base_from_spec(data):
 
 
 def normalize(data):
-    if data.get("openapi", "").startswith("3"):
+    if not isinstance(data, dict):
+        raise ValueError("Spec must be a JSON/YAML object")
+    if str(data.get("openapi") or "").startswith("3"):
         return _normalize_v3(data)
     if data.get("swagger") == "2.0":
         return _normalize_v2(data)
@@ -60,11 +62,15 @@ def _normalize_v3(data):
     ops = []
     global_security = data.get("security")
     for path, item in (data.get("paths") or {}).items():
-        path_params = [_param_v3(p) for p in item.get("parameters", [])]
+        if not isinstance(item, dict):
+            continue
+        path_params = [_param_v3(p) for p in (item.get("parameters") or []) if isinstance(p, dict)]
         for method, raw in item.items():
             if method.lower() not in _http_methods():
                 continue
-            params = path_params + [_param_v3(p) for p in raw.get("parameters", [])]
+            if not isinstance(raw, dict):
+                continue
+            params = path_params + [_param_v3(p) for p in (raw.get("parameters") or []) if isinstance(p, dict)]
             body = _request_body_v3(raw.get("requestBody") or {})
             ops.append(Operation(
                 operation_id=raw.get("operationId") or f"{method}_{path}",
@@ -82,11 +88,15 @@ def _normalize_v2(data):
     ops = []
     global_security = data.get("security")
     for path, item in (data.get("paths") or {}).items():
-        path_params = [_param_v2(p) for p in item.get("parameters", [])]
+        if not isinstance(item, dict):
+            continue
+        path_params = [_param_v2(p) for p in (item.get("parameters") or []) if isinstance(p, dict)]
         for method, raw in item.items():
             if method.lower() not in _http_methods():
                 continue
-            params = path_params + [_param_v2(p) for p in raw.get("parameters", [])]
+            if not isinstance(raw, dict):
+                continue
+            params = path_params + [_param_v2(p) for p in (raw.get("parameters") or []) if isinstance(p, dict)]
             body = {}
             non_body = []
             for p in params:
