@@ -15,7 +15,10 @@ def run(op, ctx, baseline):
     if reflected:
         return [Finding("HIGH", "massassign", op.method, op.path, meta, resp.status,
                         f"response reflected extra field {reflected[0]}", "HIGH")]
-    if resp.status != base_resp.status and resp.status < 500:
+    # A 4xx after adding extra fields means the API REJECTED them — that is the
+    # secure outcome, not a vulnerability. Only flag when the request still
+    # succeeded (2xx/3xx) but behaved differently from the baseline.
+    if resp.status != base_resp.status and 200 <= resp.status < 400:
         return [Finding("MEDIUM", "massassign", op.method, op.path, meta, resp.status,
                         f"extra fields changed status {base_resp.status}->{resp.status}", "MEDIUM")]
     return []

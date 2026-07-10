@@ -19,4 +19,12 @@ def run(op, ctx, baseline):
 
 def _looks_like_data(body):
     body = (body or "").strip()
-    return body.startswith(("{", "[")) and len(body) > 2
+    if not (body.startswith(("{", "[")) and len(body) > 2):
+        return False
+    # A JSON error/denial body ({"error": "..."} etc.) is not data exposure — do
+    # not over-rate it as CRITICAL; the auth-bypass itself is still reported (HIGH).
+    low = body.lower()
+    if any(w in low for w in ('"error"', 'unauthor', 'forbidden', 'denied',
+                              'not allowed', 'require', 'login', 'invalid', 'missing')):
+        return False
+    return True
