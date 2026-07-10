@@ -3,12 +3,17 @@ from ..request import build_request, send
 
 ALL = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
 DESTRUCTIVE = {"POST", "PUT", "PATCH", "DELETE"}
+# OPTIONS/HEAD returning 2xx is normal (CORS preflight, HEAD mirroring GET) —
+# not an "undeclared method" vulnerability, so never flag them.
+SAFE_EXPECTED = {"OPTIONS", "HEAD"}
 
 
 def run(op, ctx, baseline):
     findings = []
     declared = ctx.path_methods.get(op.path, set())
     for method in sorted(ALL - declared):
+        if method in SAFE_EXPECTED:
+            continue
         if method in DESTRUCTIVE and not ctx.allow_write:
             continue
         req, meta = build_request(op, ctx.base_url, ctx.auth, method=method)
