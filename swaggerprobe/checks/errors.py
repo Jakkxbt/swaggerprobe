@@ -4,8 +4,8 @@ from ..models import Finding
 
 LEAK_RE = re.compile(
     r"(Traceback \(most recent call last\)|at [\w.$]+\(.*:\d+\)|debug\s*=\s*true|"
-    r"\b(?:10|172\.(?:1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}\b|"
-    r"(?:Apache|nginx|Express|Django|Flask|Werkzeug)/\d|SELECT .* FROM|SQLSTATE)",
+    r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b|"
+    r"(?:Apache|nginx|Express|Django|Flask|Werkzeug)/\d|SELECT [^\n]{1,200}? FROM|SQLSTATE)",
     re.I | re.S,
 )
 

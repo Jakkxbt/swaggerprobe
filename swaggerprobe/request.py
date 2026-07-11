@@ -11,6 +11,29 @@ from .models import HttpResponse
 DEFAULT_TIMEOUT = 10
 
 
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but drop credentials when the host changes so an
+    Authorization/Cookie header set for the original host is never replayed to a
+    redirect target on a different host."""
+
+    _SENSITIVE = ("authorization", "cookie", "proxy-authorization")
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is None:
+            return None
+        old_host = urllib.parse.urlsplit(req.full_url).netloc
+        new_host = urllib.parse.urlsplit(newurl).netloc
+        if old_host != new_host:
+            for name in list(new.headers):
+                if name.lower() in self._SENSITIVE:
+                    del new.headers[name]
+        return new
+
+
+_OPENER = urllib.request.build_opener(_SafeRedirectHandler)
+
+
 def parse_headers(values):
     headers = {}
     for value in values or []:
@@ -45,7 +68,7 @@ def build_request(op, base_url, auth_headers=None, overrides=None, method=None, 
 
     if op.request_body and used_method not in {"GET", "HEAD"}:
         body = sample_body(op.request_body)
-        if body_extra:
+        if body_extra and isinstance(body, dict):
             body.update(body_extra)
         headers.setdefault("Content-Type", "application/json")
 
@@ -62,7 +85,7 @@ def build_request(op, base_url, auth_headers=None, overrides=None, method=None, 
 def send(req, timeout=DEFAULT_TIMEOUT):
     start = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _OPENER.open(req, timeout=timeout) as resp:
             body = resp.read(51200).decode("utf-8", "replace")
             return HttpResponse(resp.status, dict(resp.headers), body, time.time() - start)
     except urllib.error.HTTPError as exc:
